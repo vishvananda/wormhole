@@ -25,6 +25,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/golang/glog"
+	"github.com/vishvananda/netns"
 )
 
 var (
@@ -49,22 +50,23 @@ func NewLoadBalancerRR() *LoadBalancerRR {
 
 // NextEndpoint returns a service endpoint.
 // The service endpoint is chosen using the round-robin algorithm.
-func (lb *LoadBalancerRR) NextEndpoint(service string, srcAddr net.Addr) (string, error) {
+func (lb *LoadBalancerRR) NextEndpoint(service string, srcAddr net.Addr) (netns.NsHandle, string, error) {
+	ns := netns.None()
 	lb.lock.RLock()
 	endpoints, exists := lb.endpointsMap[service]
 	index := lb.rrIndex[service]
 	lb.lock.RUnlock()
 	if !exists {
-		return "", ErrMissingServiceEntry
+		return ns, "", ErrMissingServiceEntry
 	}
 	if len(endpoints) == 0 {
-		return "", ErrMissingEndpoints
+		return ns, "", ErrMissingEndpoints
 	}
 	endpoint := endpoints[index]
 	lb.lock.Lock()
 	lb.rrIndex[service] = (index + 1) % len(endpoints)
 	lb.lock.Unlock()
-	return endpoint, nil
+	return ns, endpoint, nil
 }
 
 func isValidEndpoint(spec string) bool {

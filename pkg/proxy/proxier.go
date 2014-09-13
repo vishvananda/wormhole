@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+	"github.com/vishvananda/netns"
 )
 
 type serviceInfo struct {
@@ -92,7 +94,7 @@ func (tcp *tcpProxySocket) ProxyLoop(service string, proxier *Proxier) {
 			continue
 		}
 		glog.Infof("Accepted TCP connection from %v to %v", inConn.RemoteAddr(), inConn.LocalAddr())
-		endpoint, err := proxier.loadBalancer.NextEndpoint(service, inConn.RemoteAddr())
+		ns, endpoint, err := proxier.loadBalancer.NextEndpoint(service, inConn.RemoteAddr())
 		if err != nil {
 			glog.Errorf("Couldn't find an endpoint for %s %v", service, err)
 			inConn.Close()
@@ -101,6 +103,22 @@ func (tcp *tcpProxySocket) ProxyLoop(service string, proxier *Proxier) {
 		glog.Infof("Mapped service %s to endpoint %s", service, endpoint)
 		// TODO: This could spin up a new goroutine to make the outbound connection,
 		// and keep accepting inbound traffic.
+		if ns.IsOpen() {
+			glog.Infof("Using namespace %v for endpoint %s", ns, endpoint)
+			runtime.LockOSThread()
+			defer runtime.UnlockOSThread()
+			origns, err := netns.Get()
+			if err != nil {
+				glog.Errorf("Failed to get original ns: %v", err)
+				continue
+			}
+			err = netns.Set(ns)
+			if err != nil {
+				glog.Errorf("Failed to set ns: %v", err)
+				continue
+			}
+			defer netns.Set(origns)
+		}
 		outConn, err := net.DialTimeout("tcp", endpoint, endpointDialTimeout)
 		if err != nil {
 			// TODO: Try another endpoint?
@@ -200,12 +218,18 @@ func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr ne
 		// TODO: This could spin up a new goroutine to make the outbound connection,
 		// and keep accepting inbound traffic.
 		glog.Infof("New UDP connection from %s", cliAddr)
-		endpoint, err := proxier.loadBalancer.NextEndpoint(service, cliAddr)
+		ns, endpoint, err := proxier.loadBalancer.NextEndpoint(service, cliAddr)
 		if err != nil {
 			glog.Errorf("Couldn't find an endpoint for %s %v", service, err)
 			return nil, err
 		}
 		glog.Infof("Mapped service %s to endpoint %s", service, endpoint)
+		if ns.IsOpen() {
+			glog.Infof("Using namespace %v for endpoint %s", ns, endpoint)
+			runtime.LockOSThread()
+			netns.Set(ns)
+			defer runtime.UnlockOSThread()
+		}
 		svrConn, err = net.DialTimeout("udp", endpoint, endpointDialTimeout)
 		if err != nil {
 			// TODO: Try another endpoint?
@@ -290,6 +314,13 @@ type Proxier struct {
 	mu           sync.Mutex // protects serviceMap
 	serviceMap   map[string]*serviceInfo
 	address      string
+	// NOTE(vish): this ns probably should be part of the Service struct
+	ns           netns.NsHandle
+}
+
+	// NOTE(vish): this ns probably should be part of the Service struct
+func (proxier *Proxier) SetNs(ns netns.NsHandle) {
+	proxier.ns = ns
 }
 
 // NewProxier returns a new Proxier given a LoadBalancer and an
@@ -299,6 +330,8 @@ func NewProxier(loadBalancer LoadBalancer, address string) *Proxier {
 		loadBalancer: loadBalancer,
 		serviceMap:   make(map[string]*serviceInfo),
 		address:      address,
+		// NOTE(vish): this ns probably should be part of the Service struct
+		ns:           netns.None(),
 	}
 }
 
@@ -386,6 +419,45 @@ func (proxier *Proxier) startAccepting(service string, sock proxySocket) {
 
 // How long we leave idle UDP connections open.
 const udpIdleTimeout = 1 * time.Minute
+
+func (proxier *Proxier) AddService(service, protocol string, port int) (int, error) {
+	glog.Infof("Adding proxy %s on %s:%d", service, proxier.address, port)
+	if proxier.ns.IsOpen() {
+		glog.Infof("Using namespace %v for proxy %s", proxier.ns, service)
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		origns, err := netns.Get()
+		if err != nil {
+			return 0, err
+		}
+		err = netns.Set(proxier.ns)
+		if err != nil {
+			return 0, err
+		}
+		defer netns.Set(origns)
+	}
+	sock, err := newProxySocket(protocol, proxier.address, port)
+	if err != nil {
+		return 0, err
+	}
+	_, portStr, err := net.SplitHostPort(sock.Addr().String())
+	if err != nil {
+		return 0, err
+	}
+	portNum, err := strconv.Atoi(portStr)
+	if err != nil {
+		return 0, err
+	}
+	proxier.setServiceInfo(service, &serviceInfo{
+		port:     portNum,
+		protocol: protocol,
+		active:   true,
+		socket:   sock,
+		timeout:  udpIdleTimeout,
+	})
+	proxier.startAccepting(service, sock)
+	return portNum, err
+}
 
 // OnUpdate manages the active set of service proxies.
 // Active service proxies are reinitialized if found in the update set or

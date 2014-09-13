@@ -17,12 +17,13 @@ limitations under the License.
 package proxy
 
 import (
+	"github.com/vishvananda/netns"
 	"net"
 )
 
 // LoadBalancer is an interface for distributing incoming requests to service endpoints.
 type LoadBalancer interface {
-	// NextEndpoint returns the endpoint to handle a request for the given
+	// NextEndpoint returns the namespace and endpoint to handle a request for the given
 	// service and source address.
-	NextEndpoint(service string, srcAddr net.Addr) (string, error)
+	NextEndpoint(service string, srcAddr net.Addr) (netns.NsHandle, string, error)
 }
