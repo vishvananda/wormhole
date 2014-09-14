@@ -59,6 +59,9 @@ func (si *serviceInfo) setActive(val bool) bool {
 // How long we wait for a connection to a backend.
 const endpointDialTimeout = 5 * time.Second
 
+// How long we retry when opening a listening socket.
+const listenTimeout = 5 * time.Second
+
 // Abstraction over TCP/UDP sockets which are proxied.
 type proxySocket interface {
 	// Addr gets the net.Addr for a proxySocket.
@@ -74,6 +77,24 @@ type proxySocket interface {
 // no new connections are allowed but existing connections are left untouched.
 type tcpProxySocket struct {
 	net.Listener
+}
+
+func retryDial(network, address string, timeout time.Duration) (net.Conn, error) {
+	endTime := time.Now().Add(timeout)
+	for {
+		remaining := endTime.Sub(time.Now())
+		outConn, err := net.DialTimeout(network, address, remaining)
+		if err != nil {
+			if endTime.After(time.Now()) {
+				glog.Infof("Dial retrying on error for %s: %v", remaining, err)
+				time.Sleep(100 * time.Millisecond)
+				continue
+			} else {
+				return nil, fmt.Errorf("Dial retry timed out")
+			}
+		}
+		return outConn, err
+	}
 }
 
 func (tcp *tcpProxySocket) ProxyLoop(service string, proxier *Proxier) {
@@ -119,7 +140,7 @@ func (tcp *tcpProxySocket) ProxyLoop(service string, proxier *Proxier) {
 			}
 			defer netns.Set(origns)
 		}
-		outConn, err := net.DialTimeout("tcp", endpoint, endpointDialTimeout)
+		outConn, err := retryDial("tcp", endpoint, endpointDialTimeout)
 		if err != nil {
 			// TODO: Try another endpoint?
 			glog.Errorf("Dial failed: %v", err)
@@ -230,7 +251,7 @@ func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr ne
 			netns.Set(ns)
 			defer runtime.UnlockOSThread()
 		}
-		svrConn, err = net.DialTimeout("udp", endpoint, endpointDialTimeout)
+		svrConn, err = retryDial("udp", endpoint, endpointDialTimeout)
 		if err != nil {
 			// TODO: Try another endpoint?
 			glog.Errorf("Dial failed: %v", err)
@@ -286,6 +307,26 @@ func logTimeout(err error) bool {
 }
 
 func newProxySocket(protocol string, host string, port int) (proxySocket, error) {
+	endTime := time.Now().Add(listenTimeout)
+	for {
+		remaining := endTime.Sub(time.Now())
+		sock, err := innerProxySocket(protocol, host, port)
+		if err != nil {
+			// TODO(vish): don't retry if the socket is in use
+			if endTime.After(time.Now()) {
+				glog.Infof("ProxySocket retrying on error for %v: %v", remaining, err)
+				time.Sleep(100 * time.Millisecond)
+				continue
+			} else {
+				return nil, fmt.Errorf("ProxySocket retry timed out")
+			}
+		}
+		return sock, err
+	}
+
+}
+
+func innerProxySocket(protocol string, host string, port int) (proxySocket, error) {
 	switch strings.ToUpper(protocol) {
 	case "TCP":
 		listener, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
@@ -315,10 +356,10 @@ type Proxier struct {
 	serviceMap   map[string]*serviceInfo
 	address      string
 	// NOTE(vish): this ns probably should be part of the Service struct
-	ns           netns.NsHandle
+	ns netns.NsHandle
 }
 
-	// NOTE(vish): this ns probably should be part of the Service struct
+// NOTE(vish): this ns probably should be part of the Service struct
 func (proxier *Proxier) SetNs(ns netns.NsHandle) {
 	proxier.ns = ns
 }
@@ -331,7 +372,7 @@ func NewProxier(loadBalancer LoadBalancer, address string) *Proxier {
 		serviceMap:   make(map[string]*serviceInfo),
 		address:      address,
 		// NOTE(vish): this ns probably should be part of the Service struct
-		ns:           netns.None(),
+		ns: netns.None(),
 	}
 }
 
