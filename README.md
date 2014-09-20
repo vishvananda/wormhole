@@ -59,7 +59,7 @@ To get started you will need to:
 
     sudo ./wormholed
 
-The wormhole cli communicates with the deamon over port 9999. To verify it is working:
+The wormhole cli communicates with the daemon over port 9999. To verify it is working:
 
     ./wormhole ping
 
