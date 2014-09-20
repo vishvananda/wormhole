@@ -52,7 +52,7 @@ To get started you will need to:
  a) Create a secret key
 
     sudo mkdir -p /etc/wormhole
-    cat /dev/urandom | tr -dc '0-9a-zA-Z' | head -c 32 > /etc/wormhole/key.secret
+    cat /dev/urandom | tr -dc '0-9a-zA-Z' | head -c 32 | sudo tee /etc/wormhole/key.secret
     sudo chmod 600 /etc/wormhole/key.secret
 
  b) Run the daemon as root
