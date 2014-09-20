@@ -39,11 +39,71 @@ one advantage of the localhost approach is almost every application is
 configured to listen on localhost out of the box so it makes the build
 process super simple.
 
-## Other Tools ##
+## Examples ##
 
-Most of what wormhole does can be accomplished with existing tools like socat
-and iproute2. Wormhole was created because the process is complex and fragile.
-It is much easier to have a single binary that does it all for you.
+### Legend for diagrams ###
+![ex-legend](https://cloud.githubusercontent.com/assets/142222/4346902/25bd6e18-411f-11e4-8f0c-b2a4cfa2208f.png)
+
+### Proxy to the mysql in a local container ###
+![ex-01](https://cloud.githubusercontent.com/assets/142222/4346904/2a7fb85c-411f-11e4-9637-0e7bbd5fe506.png)
+
+    mysql=`docker run -d wormhole/mysql`
+    ./wormhole create url :3306 docker-ns tail docker-ns $mysql
+    mysql -u root -h 127.0.0.1
+
+This requires a local install of mysql-client (ubuntu: apt-get install mysql-client).
+
+### Connect a local wp container to a local mysql container ###
+![ex-02](https://cloud.githubusercontent.com/assets/142222/4346903/2a750024-411f-11e4-9aa4-818bfe05b0e1.png)
+
+    app=`docker run -d wormhole/wordpress`
+    mysql=`docker run -d wormhole/mysql`
+    ./wormhole create url :3306 docker-ns $app tail docker-ns $mysql
+
+### Create a local port that does the above on connection  ###
+![ex-03](https://cloud.githubusercontent.com/assets/142222/4346905/2a8f1446-411f-11e4-97e3-41060c6d2432.png)
+
+    ./wormhole create url :80 trigger docker-run wormhole/wordpress \
+               child url :3306 tail docker-run wormhole/mysql
+
+### Create a local port to talk to a remote mysql ###
+![ex-04](https://cloud.githubusercontent.com/assets/142222/4346908/2a96b5f2-411f-11e4-9e36-1921a8a3cbda.png)
+
+    mysql=`docker -H myserver run -d wormhole/mysql`
+    ./wormhole create url :3306 remote myserver trigger docker-ns $mysql
+
+The remote server must be running wormhole with the same key.secret
+
+### Do the above over an ipsec tunnel ###
+![ex-05](https://cloud.githubusercontent.com/assets/142222/4346907/2a96b868-411f-11e4-8e86-7bb2f9ff8e15.png)
+
+    mysql=`docker -H myserver run -d wormhole/mysql`
+    ./wormhole create url :3306 tunnel myserver trigger docker-ns $mysql
+
+### Create a local port that runs a remote mysql on connection ###
+![ex-06](https://cloud.githubusercontent.com/assets/142222/4346909/2a96d406-411f-11e4-9461-3308404704ba.png)
+
+    ./wormhole create url :3306 trigger tunnel myserver trigger docker-run wormhole/mysql
+
+If the image has not been downloaded on 'myserver' then the initial
+connection will timeout.
+
+### Create a local port that runs wp followed by the above  ###
+![ex-07](https://cloud.githubusercontent.com/assets/142222/4346906/2a949a4c-411f-11e4-9784-44ba18ca7a1d.png)
+
+    ./wormhole create url :80 trigger docker-run wormhole/wordpress \
+               child url :3306 tunnel myserver trigger docker-run wormhole/mysql
+
+### Forget all this proxy stuff and make an ipsec tunnel  ###
+![ex-08](https://cloud.githubusercontent.com/assets/142222/4346910/2a973aa4-411f-11e4-8ff3-b4a7c6e4efce.png)
+
+
+    ./wormhole tunnel-create myserver
+
+This command outputs a local and remote ip for the tunnel. Tunnels are
+not deleted when wormholed is closed. To delete the tunnel:
+
+    ./wormhole tunnel-delete myserver
 
 ## Getting Started ##
 
@@ -59,63 +119,10 @@ To get started you will need to:
 
     sudo ./wormholed
 
-The wormhole cli communicates with the daemon over port 9999. To verify it is working:
+The wormhole cli communicates with the daemon over port 9999. To verify it
+is working:
 
     ./wormhole ping
-
-## Examples ##
-
-### Proxy to the mysql in a local container ###
-
-This requires a local install of mysql-client (ubuntu: apt-get install mysql-client).
-
-    mysql=`docker run -d wormhole/mysql`
-    ./wormhole create url :3306 docker-ns tail docker-ns $mysql
-    mysql -u root -h 127.0.0.1
-
-### Connect a local wordpress container to a local mysql container ###
-
-    app=`docker run -d wormhole/wordpress`
-    mysql=`docker run -d wormhole/mysql`
-    ./wormhole create url :3306 docker-ns $app tail docker-ns $mysql
-
-### Create a local port that does the above on connection  ###
-
-    ./wormhole create url :80 trigger docker-run wormhole/wordpress \
-               child url :3306 tail docker-run wormhole/mysql
-
-### Create a local port to talk to a remote mysql ###
-
-The remote server must be running wormhole with the same key.secret
-
-    mysql=`docker -H myserver run -d wormhole/mysql`
-    ./wormhole create url :3306 remote myserver tail docker-ns $mysql
-
-### Create a local port to talk to a remote mysql over an ipsec tunnel ###
-
-    mysql=`docker -H myserver run -d wormhole/mysql`
-    ./wormhole create url :3306 tunnel myserver tail docker-ns $mysql
-
-### Create a local port that runs a remote mysql server on connection ###
-
-If the image has not been downloaded on 'myserver' then the initial connection will timeout.
-
-    ./wormhole create url :3306 trigger tunnel myserver trigger docker-run wormhole/mysql
-
-### Create a local port that runs wordpress locally followed by the above  ###
-
-    ./wormhole create url :80 trigger docker-run wormhole/wordpress \
-               child url :3306 tunnel myserver tail docker-run wormhole/mysql
-
-### Forget all this proxy stuff and just give me an ipsec tunnel  ###
-
-This command outputs a local and remote ip for the tunnel.
-
-    ./wormhole tunnel-create myserver
-
-Tunnels are not deleted when wormholed is closed. To delete the tunnel:
-
-    ./wormhole tunnel-delete myserver
 
 ## Local Build and Test ##
 
@@ -138,6 +145,11 @@ Unit Tests (functional tests use sudo):
 Functional tests (requires root):
 
     make test-functional # or sudo -E go test -v functional_test.go
+
+## Alternative Tools ##
+
+Most of what wormhole does can be accomplished by hacking together various
+tools like socat and iproute2.
 
 ## Future Work ##
 
