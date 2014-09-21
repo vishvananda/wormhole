@@ -449,7 +449,7 @@ func TestDockerRun(t *testing.T) {
 	defer c.cleanup()
 	c.start(SERVER)
 	c.wait("")
-	c.execute(CLIENT, "create", "url", ":9000", "tail", "url", ":9001", "docker-run", "pong")
+	c.execute(CLIENT, "create", "url", ":9000", "tail", "url", ":9001", "docker-run", "wormhole/pong")
 	msg := "ping"
 	result := c.sendTimeout(msg, ":9000")
 	if result != msg {

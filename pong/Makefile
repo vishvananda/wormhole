@@ -5,4 +5,4 @@ pong: pong.go
 
 .PHONY: docker-pong
 docker-pong: pong
-	docker build -t pong .
+	docker build -t wormhole/pong .
