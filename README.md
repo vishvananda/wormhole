@@ -66,13 +66,13 @@ This requires a local install of mysql-client (ubuntu: apt-get install mysql-cli
 ![ex-03](https://cloud.githubusercontent.com/assets/142222/4346905/2a8f1446-411f-11e4-97e3-41060c6d2432.png)
 
     ./wormhole create url :80 trigger docker-run wormhole/wordpress \
-               child url :3306 tail docker-run wormhole/mysql
+               child url :3306 trigger docker-run wormhole/mysql
 
 ### Create a local port to talk to a remote mysql ###
 ![ex-04](https://cloud.githubusercontent.com/assets/142222/4346908/2a96b5f2-411f-11e4-9e36-1921a8a3cbda.png)
 
     mysql=`docker -H myserver run -d wormhole/mysql`
-    ./wormhole create url :3306 remote myserver trigger docker-ns $mysql
+    ./wormhole create url :3306 remote myserver tail docker-ns $mysql
 
 The remote server must be running wormhole with the same key.secret
 
