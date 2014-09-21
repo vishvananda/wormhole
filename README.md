@@ -1,6 +1,6 @@
 # wormhole #
 
-## A namespaced activated tunneling proxy ##
+### A namespace-aware socket-activated tunneling proxy ###
 
 Wormhole is an activated proxy daemon and an associated cli. It allows you to
 securely connect ports together on different physical machines or containers.
@@ -10,34 +10,36 @@ start when you connect to them.
 
 ## But Why? ##
 
-Containers have mostly been copying networking and configuration from servers,
-but containers provide radical  new options that haven't been explored. They
-gives us the opportunity to move a whole bunch of complicated distributed
-systems problems like orchestration, service discovery, configuration
-management, and security down into the communication layer. If we can
-accomplish this, we achieve something quite amazing: Standard containers become
-truly reusable.
+Containers give us the opportunity to move a whole bunch of complicated
+distributed systems problems (orchestration, service discovery, configuration
+management, and security) into the communication layer. This can unlock the
+true value of containers: Standard containers actually become standard.
 
-This isn't intended to be a production solution for container relationships,
-consider it an exploration into moving more down into the communication layer.
-If I can create an application container that talks to a single port to get
-a secure connection to the database, I've made a bunch of things easier. I
-don't have to configure the application to talk to an ip address. I don't
-have to set a secure password on the database server. I can move the database
-without breaking the application. I can put another database in play and
-start load balancing between them.
+This isn't intended to be a production solution for container relationships.
+Consider it an exploration of the above value. If you can create an
+application container that talks to a single port to get a secure connection
+to the database, many things get simpler. You don't have to configure the
+application with the proper address. You don't have to set a secure password
+for the database server. You can move the database without breaking the
+application. You can add a second database and start load balancing.
 
-Yes it is computationally expensive to proxy these connections, but if the
-proxy layer gains some more features like load-balancing and traffic analysis
-then it is simply replacing existing proxies instead of adding an additional
-layer to most workloads.
+Most importantly, standardizing the communication layer means that containers
+are trivially sharable. Everyone who needs a mysql database container can
+use the same one. No configuration of the container is necessary, you can just
+drop it in and start using it.
 
-Some people may feel that is overloading localhost to proxy connections this
-way; localhost traffic should always be local. That is a fair point and it
-would be completely reasonable to do this on some other known ip address. The
-one advantage of the localhost approach is almost every application is
-configured to listen on localhost out of the box so it makes the build
-process super simple.
+Yes it is computationally more expensive to proxy connections, but consider:
+
+1. It is possible to accomplish many of the same things with sdn instead
+   of proxying
+2. This proxy could replace the proxies that many services already use
+   for load balancing or ssl termination.
+
+Some people may feel that is inappropriate to proxy localhost connections this
+way, that localhost traffic should always be local. The above principles can
+be accomplished by using another well-known ip address. The one advantage of
+the localhost approach is almost every application is configured to listen on
+localhost out of the box so it makes container builds very easy.
 
 ## Examples ##
 
