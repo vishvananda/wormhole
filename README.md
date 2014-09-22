@@ -43,6 +43,10 @@ localhost out of the box so it makes container builds very easy.
 
 ## Examples ##
 
+Wormhole connects services together. The examples use the a wordpress
+container and a mysql container as the canonical example of two things that
+need to be connected.
+
 ### Legend for diagrams ###
 ![ex-legend](https://cloud.githubusercontent.com/assets/142222/4346902/25bd6e18-411f-11e4-8f0c-b2a4cfa2208f.png)
 
@@ -169,3 +173,10 @@ Commands for list and tunnel-list should be added.
 Wormhole could grow support for load balancing.
 
 Traffic analysis and reporting could be added to the proxy layer.
+
+## Disclaimer ##
+
+Wormhole is alpha quality code and, while efforts have been made to keep the
+daemon secure, it must run as root and therefore offers a tempting attack
+surface. It is not recommended to run this in production until it has been
+more thouroughly vetted.
