@@ -1,19 +1,19 @@
 # wormhole #
 
-### A namespace-aware socket-activated tunneling proxy ###
+### A smart proxy to connect docker containers ###
 
-Wormhole is an activated proxy daemon and an associated cli. It allows you to
-securely connect ports together on different physical machines or containers.
-This allows for interesting things like connecting to things running on
-localhost inside the container namespace or creating on-demand services that
-start when you connect to them.
+Wormhole is a namespace-aware socket-activated tunneling proxy. It allows you
+to securely connect ports together on different physical machines inside
+docker containers. This allows for interesting things like connecting services
+running on localhost inside the container namespace or creating on-demand
+services that start when you connect to them.
 
 ## But Why? ##
 
 Containers give us the opportunity to move a whole bunch of complicated
 distributed systems problems (orchestration, service discovery, configuration
-management, and security) into the communication layer. This can unlock the
-true value of containers: Standard containers actually become standard.
+management, and security) into the communication layer. They have the
+potential to finally give us [truly standard components](https://medium.com/@vishvananda/standard-components-not-standard-containers-c30567f23da6)
 
 This isn't intended to be a production solution for container relationships.
 Consider it an exploration of the above value. If you can create an
