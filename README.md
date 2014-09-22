@@ -1,6 +1,6 @@
 # wormhole #
 
-### A smart proxy to connect docker containers ###
+### A smart proxy that connects docker containers ###
 
 Wormhole is a namespace-aware socket-activated tunneling proxy. It allows you
 to securely connect ports together on different physical machines inside
