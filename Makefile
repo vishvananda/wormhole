@@ -21,10 +21,10 @@ SHARED_DEPS = \
 	github.com/raff/tls-ext \
 	github.com/raff/tls-psk
 
-# the rest of kubernetes is needed for pkg/proxy
-# the other dependencies besides netlink are for kubernetes
+# kubernetes/pkg/api is needed for pkg/proxy
+# the other dependencies besides netns and netlink are for kubernetes
 SERVER_DEPS = \
-	github.com/GoogleCloudPlatform/kubernetes \
+	github.com/GoogleCloudPlatform/kubernetes/pkg/api \
 	github.com/fsouza/go-dockerclient \
 	github.com/golang/glog \
 	gopkg.in/v1/yaml \
