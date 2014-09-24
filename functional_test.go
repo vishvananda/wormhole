@@ -30,7 +30,7 @@ type Context struct {
 	Ns      *netns.NsHandle
 }
 
-func addrAdd(t *testing.T, l *netlink.Link, a string) {
+func addrAdd(t *testing.T, l netlink.Link, a string) {
 	addr, err := netlink.ParseAddr(a)
 	if err != nil {
 		t.Fatal(err)

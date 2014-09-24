@@ -188,19 +188,19 @@ func discoverTunnels() {
 	glog.Infof("Finished discovering existing tunnels")
 }
 
-func getLink(ip net.IP) (*netlink.Link, error) {
+func getLink(ip net.IP) (netlink.Link, error) {
 	links, err := netlink.LinkList()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get links")
 	}
 	for _, link := range links {
-		addrs, err := netlink.AddrList(&link, netlink.FAMILY_ALL)
+		addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to get addrs")
 		}
 		for _, addr := range addrs {
 			if addr.IP.Equal(ip) {
-				return &link, nil
+				return link, nil
 			}
 		}
 	}

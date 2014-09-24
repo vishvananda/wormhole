@@ -15,7 +15,7 @@ func getSource(dest net.IP) (net.IP, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get routes")
 	}
-	var link *netlink.Link
+	var link netlink.Link
 	for _, route := range routes {
 		if route.Dst == nil {
 			link = route.Link
