@@ -17,6 +17,7 @@ import (
 type options struct {
 	hosts        []string
 	src          net.IP
+	external     net.IP
 	cidr         *net.IPNet
 	config       *tls.Config
 	udpStartPort int
@@ -27,7 +28,8 @@ var opts *options
 
 func parseFlags() {
 	keyfile := flag.String("K", "/etc/wormhole/key.secret", "Keyfile for psk auth (if not found defaults to insecure key)")
-	src := flag.String("I", "", "Ip for tunnel (defaults to src of default route)")
+	src := flag.String("I", "", "Internal Ip for tunnel (defaults to src of default route)")
+	external := flag.String("E", "", "External Ip for tunnel (defaults to src of default route)")
 	cidr := flag.String("C", "100.65.0.0/14", "Cidr for overlay ips (must be the same on all hosts)")
 	ports := flag.String("P", "4500-4599", "Inclusive port range for udp tunnels")
 	hosts := utils.NewListOpts(utils.ValidateAddr)
@@ -50,6 +52,16 @@ func parseFlags() {
 		srcIP = net.ParseIP(*src)
 		if srcIP == nil {
 			log.Fatalf("Invalid source IP for tunnels: %v", src)
+		}
+	}
+	var externalIP net.IP
+	if *external == "" {
+		externalIP = srcIP
+	} else {
+		log.Printf("Got an external ip of %v", *external)
+		externalIP = net.ParseIP(*external)
+		if externalIP == nil {
+			log.Fatalf("Invalid external IP for tunnels: %v", external)
 		}
 	}
 	_, cidrNet, err := net.ParseCIDR(*cidr)
@@ -99,6 +111,7 @@ func parseFlags() {
 	opts = &options{
 		hosts:        hosts.GetAll(),
 		src:          srcIP,
+		external:     externalIP,
 		cidr:         cidrNet,
 		config:       config,
 		udpStartPort: startPort,

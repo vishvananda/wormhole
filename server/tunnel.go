@@ -209,7 +209,7 @@ func getLink(ip net.IP) (netlink.Link, error) {
 
 func getSrcIP(dst net.IP) (net.IP, error) {
 	if dst == nil {
-		return opts.src, nil
+		return opts.external, nil
 	}
 	tunnel := getTunnel(dst.String())
 	if tunnel == nil {
@@ -312,7 +312,7 @@ func createTunnel(host string, udp bool) (net.IP, net.IP, error) {
 		}
 		// create tail of tunnel
 		var out *client.Tunnel
-		dst, out, err = c.BuildTunnel(opts.src, tunnel)
+		dst, out, err = c.BuildTunnel(opts.external, tunnel)
 		if err != nil {
 			_, ok := err.(IPInUse)
 			if ok {
@@ -328,12 +328,12 @@ func createTunnel(host string, udp bool) (net.IP, net.IP, error) {
 			}
 			glog.Errorf("Remote BuildTunnel failed: %v", err)
 			// cleanup partial tunnel
-			c.DestroyTunnel(opts.src)
+			c.DestroyTunnel(opts.external)
 			return nil, nil, err
 		}
 		if exists != nil && !out.Equal(tunnel) {
 			glog.Warningf("Destroying remote mismatched tunnel")
-			c.DestroyTunnel(opts.src)
+			c.DestroyTunnel(opts.external)
 			continue
 		}
 		tunnel = out
@@ -347,7 +347,7 @@ func createTunnel(host string, udp bool) (net.IP, net.IP, error) {
 		_, tunnel, err = buildTunnelLocal(dst, tunnel)
 		if err != nil {
 			glog.Errorf("Local buildTunnel failed: %v", err)
-			c.DestroyTunnel(opts.src)
+			c.DestroyTunnel(opts.external)
 			destroyTunnel(dst)
 			return nil, nil, err
 		}
@@ -362,7 +362,7 @@ func deleteTunnel(host string) error {
 	}
 	defer c.Close()
 
-	dst, _ := c.DestroyTunnel(opts.src)
+	dst, _ := c.DestroyTunnel(opts.external)
 	if dst != nil {
 		destroyTunnel(dst)
 	}
@@ -373,7 +373,7 @@ func buildTunnel(dst net.IP, tunnel *client.Tunnel) (net.IP, *client.Tunnel, err
 	exists := getTunnel(dst.String())
 	if exists != nil {
 		glog.Infof("Tunnel already exists: %v, %v", exists.Src, exists.Dst)
-		return opts.src, exists, nil
+		return opts.external, exists, nil
 	}
 	var err error
 	if tunnel.DstPort != 0 {
@@ -400,7 +400,7 @@ func buildTunnel(dst net.IP, tunnel *client.Tunnel) (net.IP, *client.Tunnel, err
 func buildTunnelLocal(dst net.IP, tunnel *client.Tunnel) (net.IP, *client.Tunnel, error) {
 	addTunnel(dst.String(), tunnel)
 
-	src := opts.src
+	src := opts.external
 
 	srcNet := netlink.NewIPNet(tunnel.Src)
 	dstNet := netlink.NewIPNet(tunnel.Dst)
@@ -420,7 +420,7 @@ func buildTunnelLocal(dst net.IP, tunnel *client.Tunnel) (net.IP, *client.Tunnel
 		return nil, nil, err
 	}
 
-	link, err := getLink(src)
+	link, err := getLink(opts.src)
 	if err != nil {
 		glog.Errorf("Failed to get link for address: %v", err)
 		return nil, nil, err
@@ -477,9 +477,8 @@ func destroyTunnel(dst net.IP) (net.IP, error) {
 		glog.Errorf(s)
 		return nil, fmt.Errorf(s)
 	}
-	// use the route back to caller to determine source ip
 
-	src := opts.src
+	src := opts.external
 
 	srcNet := netlink.NewIPNet(tunnel.Src)
 	dstNet := netlink.NewIPNet(tunnel.Dst)
