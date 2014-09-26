@@ -27,6 +27,7 @@ SERVER_DEPS = \
 	github.com/GoogleCloudPlatform/kubernetes/pkg/api \
 	github.com/fsouza/go-dockerclient \
 	github.com/golang/glog \
+	code.google.com/p/go.net/context \
 	gopkg.in/v1/yaml \
 	github.com/vishvananda/netns \
 	github.com/vishvananda/netlink
