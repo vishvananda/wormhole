@@ -404,8 +404,6 @@ func buildTunnelLocal(dst net.IP, tunnel *client.Tunnel) (net.IP, *client.Tunnel
 
 	srcNet := netlink.NewIPNet(tunnel.Src)
 	dstNet := netlink.NewIPNet(tunnel.Dst)
-	// policy uses host src for net
-	policySrcNet := netlink.NewIPNet(src)
 
 	glog.Infof("Building tunnel: %v, %v", tunnel.Src, tunnel.Dst)
 	// add IP address to loopback device
@@ -438,7 +436,7 @@ func buildTunnelLocal(dst net.IP, tunnel *client.Tunnel) (net.IP, *client.Tunnel
 		return nil, nil, err
 	}
 
-	for _, policy := range getPolicies(tunnel.Reqid, src, dst, policySrcNet, dstNet) {
+	for _, policy := range getPolicies(tunnel.Reqid, src, dst, srcNet, dstNet) {
 		glog.Infof("building Policy: %v", policy)
 		// create xfrm policy rules
 		err = netlink.XfrmPolicyAdd(&policy)
@@ -482,8 +480,6 @@ func destroyTunnel(dst net.IP) (net.IP, error) {
 
 	srcNet := netlink.NewIPNet(tunnel.Src)
 	dstNet := netlink.NewIPNet(tunnel.Dst)
-	// policy uses host src for net
-	policySrcNet := netlink.NewIPNet(src)
 
 	glog.Infof("Destroying Tunnel: %v, %v", tunnel.Src, tunnel.Dst)
 
@@ -495,7 +491,7 @@ func destroyTunnel(dst net.IP) (net.IP, error) {
 		}
 	}
 
-	for _, policy := range getPolicies(tunnel.Reqid, src, dst, policySrcNet, dstNet) {
+	for _, policy := range getPolicies(tunnel.Reqid, src, dst, srcNet, dstNet) {
 		// create xfrm policy rules
 		err := netlink.XfrmPolicyDel(&policy)
 		if err != nil {
