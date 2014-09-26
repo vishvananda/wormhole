@@ -400,7 +400,7 @@ func buildTunnel(dst net.IP, tunnel *client.Tunnel) (net.IP, *client.Tunnel, err
 func buildTunnelLocal(dst net.IP, tunnel *client.Tunnel) (net.IP, *client.Tunnel, error) {
 	addTunnel(dst.String(), tunnel)
 
-	src := opts.external
+	src := opts.src
 
 	srcNet := netlink.NewIPNet(tunnel.Src)
 	dstNet := netlink.NewIPNet(tunnel.Dst)
@@ -420,7 +420,7 @@ func buildTunnelLocal(dst net.IP, tunnel *client.Tunnel) (net.IP, *client.Tunnel
 		return nil, nil, err
 	}
 
-	link, err := getLink(opts.src)
+	link, err := getLink(src)
 	if err != nil {
 		glog.Errorf("Failed to get link for address: %v", err)
 		return nil, nil, err
@@ -465,7 +465,7 @@ func buildTunnelLocal(dst net.IP, tunnel *client.Tunnel) (net.IP, *client.Tunnel
 		}
 	}
 	glog.Infof("Finished building tunnel: %v, %v", tunnel.Src, tunnel.Dst)
-	return src, tunnel, nil
+	return opts.external, tunnel, nil
 }
 
 func destroyTunnel(dst net.IP) (net.IP, error) {
