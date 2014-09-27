@@ -453,6 +453,7 @@ func buildTunnel(dst net.IP, tunnel *client.Tunnel) (net.IP, *client.Tunnel, err
 			glog.Errorf("No ports available: %v", tunnel.Dst)
 			return nil, nil, err
 		}
+		glog.Infof("Using %d for encap port", tunnel.SrcPort)
 	}
 	err = reserveIP(tunnel.Dst)
 	if err != nil {
@@ -556,7 +557,7 @@ func destroyTunnel(dst net.IP) (net.IP, error) {
 		return nil, fmt.Errorf(s)
 	}
 
-	src := opts.external
+	src := opts.src
 
 	srcNet := netlink.NewIPNet(tunnel.Src)
 	dstNet := netlink.NewIPNet(tunnel.Dst)
@@ -615,7 +616,7 @@ func destroyTunnel(dst net.IP) (net.IP, error) {
 	unreserveIP(tunnel.Dst)
 	removeTunnel(key)
 	glog.Infof("Finished destroying tunnel: %v, %v", tunnel.Src, tunnel.Dst)
-	return src, nil
+	return opts.external, nil
 }
 
 func getPolicies(reqid int, src net.IP, dst net.IP, srcNet *net.IPNet, dstNet *net.IPNet) []netlink.XfrmPolicy {
