@@ -16,6 +16,7 @@ import (
 
 var tunnelsMutex sync.Mutex
 var tunnels map[string]*client.Tunnel
+var listeners map[string]int
 
 var usedIPsMutex sync.Mutex
 var usedIPs map[string]bool
@@ -28,6 +29,7 @@ type NoPortsAvailable error
 
 func initTunnels() {
 	tunnels = make(map[string]*client.Tunnel)
+	listeners = make(map[string]int)
 	usedIPs = make(map[string]bool)
 	for p := opts.udpStartPort; p <= opts.udpEndPort; p++ {
 		unusedPorts = append(unusedPorts, p)
@@ -35,25 +37,30 @@ func initTunnels() {
 	discoverTunnels()
 }
 
-
 func cleanupTunnels() {
 	// Currently we leave tunnels in place
 }
 
-func addTunnel(key string, tunnel *client.Tunnel) {
+func addTunnel(key string, tunnel *client.Tunnel, listener int) {
 	tunnelsMutex.Lock()
 	defer tunnelsMutex.Unlock()
 	tunnels[key] = tunnel
+	listeners[key] = listener
 }
 
 func getTunnel(key string) *client.Tunnel {
 	return tunnels[key]
 }
 
+func getListener(key string) int {
+	return listeners[key]
+}
+
 func removeTunnel(key string) {
 	tunnelsMutex.Lock()
 	defer tunnelsMutex.Unlock()
 	delete(tunnels, key)
+	delete(listeners, key)
 }
 
 func reserveIP(ip net.IP) error {
@@ -180,7 +187,14 @@ func discoverTunnels() {
 					tunnel.SrcPort = state.Encap.DstPort
 				}
 				glog.Infof("Discovered tunnel between %v and %v over %v", tunnel.Src, tunnel.Dst, dst)
-				addTunnel(dst.String(), &tunnel)
+				var socket int
+				if tunnel.SrcPort != 0 {
+					socket, err = createEncapListener(tunnel.Src, tunnel.SrcPort)
+					if err != nil {
+						glog.Warningf("Failed to create udp listener: %v", err)
+					}
+				}
+				addTunnel(dst.String(), &tunnel, socket)
 				break
 			}
 		}
@@ -273,7 +287,7 @@ func createTunnel(host string, udp bool) (net.IP, net.IP, error) {
 				glog.Errorf("No ports available: %v", dst)
 				return nil, nil, err
 			}
-			glog.Infof("Using %d for encap port", tunnel.SrcPort)
+			glog.Infof("Using %d for encap port", tunnel.DstPort)
 		}
 
 		tunnel.AuthKey = randomKey()
@@ -369,6 +383,63 @@ func deleteTunnel(host string) error {
 	return nil
 }
 
+func createEncapListener(ip net.IP, port int) (int, error) {
+	const (
+		UDP_ENCAP          = 100
+		UDP_ENCAP_ESPINUDP = 2
+	)
+	s, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, 0)
+	if err != nil {
+		return 0, err
+	}
+	err = syscall.SetsockoptInt(s, syscall.IPPROTO_UDP, UDP_ENCAP, UDP_ENCAP_ESPINUDP)
+	if err != nil {
+		return 0, err
+	}
+	var family int
+	if len(ip) <= net.IPv4len {
+		family = syscall.AF_INET
+	} else if ip.To4() != nil {
+		family = syscall.AF_INET
+	} else {
+		family = syscall.AF_INET6
+	}
+	var bindaddr syscall.Sockaddr
+	switch family {
+	case syscall.AF_INET:
+		if len(ip) == 0 {
+			ip = net.IPv4zero
+		}
+		sa := new(syscall.SockaddrInet4)
+		for i := 0; i < net.IPv4len; i++ {
+			sa.Addr[i] = ip[i]
+		}
+		sa.Port = port
+		bindaddr = sa
+	case syscall.AF_INET6:
+		sa := new(syscall.SockaddrInet6)
+		for i := 0; i < net.IPv6len; i++ {
+			sa.Addr[i] = ip[i]
+		}
+		sa.Port = port
+		// TODO: optionally allow zone for ipv6
+		// sa.ZoneId = uint32(zoneToInt(zone))
+		bindaddr = sa
+	}
+	err = syscall.Bind(s, bindaddr)
+	if err != nil {
+		return 0, err
+	}
+	return s, nil
+}
+
+func deleteEncapListener(socket int) {
+	err := syscall.Close(socket)
+	if err != nil {
+		glog.Warningf("Failed to delete tunnel udp listener: %v", err)
+	}
+}
+
 func buildTunnel(dst net.IP, tunnel *client.Tunnel) (net.IP, *client.Tunnel, error) {
 	exists := getTunnel(dst.String())
 	if exists != nil {
@@ -398,7 +469,16 @@ func buildTunnel(dst net.IP, tunnel *client.Tunnel) (net.IP, *client.Tunnel, err
 }
 
 func buildTunnelLocal(dst net.IP, tunnel *client.Tunnel) (net.IP, *client.Tunnel, error) {
-	addTunnel(dst.String(), tunnel)
+	var socket int
+	if tunnel.SrcPort != 0 {
+		var err error
+		socket, err = createEncapListener(tunnel.Src, tunnel.SrcPort)
+		if err != nil {
+			glog.Errorf("Failed to create udp listener: %v", err)
+			return nil, nil, err
+		}
+	}
+	addTunnel(dst.String(), tunnel, socket)
 
 	src := opts.src
 
@@ -528,6 +608,7 @@ func destroyTunnel(dst net.IP) (net.IP, error) {
 		}
 	}
 	if tunnel.SrcPort != 0 {
+		deleteEncapListener(getListener(key))
 		releasePort(tunnel.SrcPort)
 	}
 	unreserveIP(tunnel.Src)

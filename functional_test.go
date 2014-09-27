@@ -416,7 +416,7 @@ func TestTunnelUdp(t *testing.T) {
 	c.start(SERVER, "-I", "127.0.0.1")
 	c.wait("")
 	host := ":6666"
-	c.start(SERVER, "-H", host, "-I", "127.0.0.2")
+	c.start(SERVER, "-H", host, "-I", "127.0.0.2", "-P", "4501")
 	c.wait(host)
 	c.execute(CLIENT, "tunnel-create", "--udp", ":6666")
 	c.validateTunnel(true)
@@ -514,7 +514,7 @@ func TestRemoteUdptunnel(t *testing.T) {
 	c.start(SERVER, "-I", "127.0.0.1")
 	c.wait("")
 	host := ":6666"
-	c.start(SERVER, "-H", host, "-I", "127.0.0.2")
+	c.start(SERVER, "-H", host, "-I", "127.0.0.2", "-P", "4501")
 	c.wait(host)
 	c.execute(CLIENT, "create", "url", ":9000", "udptunnel", ":6666", "url", ":9001", "tail", "url", ":9002")
 	c.start(PONG, ":9002")
