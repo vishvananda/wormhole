@@ -74,7 +74,7 @@ func ensureNetwork(t *testing.T) *netns.NsHandle {
 	addrAdd(t, link, "127.0.0.2/32")
 
 	_, dst, _ := net.ParseCIDR("0.0.0.0/0")
-	err = netlink.RouteAdd(&netlink.Route{Link: link, Dst: dst})
+	err = netlink.RouteAdd(&netlink.Route{LinkIndex: link.Attrs().Index, Dst: dst})
 	if err != nil {
 		t.Fatal(err)
 	}

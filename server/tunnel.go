@@ -202,23 +202,23 @@ func discoverTunnels() {
 	glog.Infof("Finished discovering existing tunnels")
 }
 
-func getLink(ip net.IP) (netlink.Link, error) {
+func getLinkIndex(ip net.IP) (int, error) {
 	links, err := netlink.LinkList()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get links")
+		return -1, fmt.Errorf("Failed to get links")
 	}
 	for _, link := range links {
 		addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to get addrs")
+			return -1, fmt.Errorf("Failed to get addrs")
 		}
 		for _, addr := range addrs {
 			if addr.IP.Equal(ip) {
-				return link, nil
+				return link.Attrs().Index, nil
 			}
 		}
 	}
-	return nil, fmt.Errorf("Could not find address")
+	return -1, fmt.Errorf("Could not find address")
 }
 
 func getSrcIP(dst net.IP) (net.IP, error) {
@@ -499,7 +499,7 @@ func buildTunnelLocal(dst net.IP, tunnel *client.Tunnel) (net.IP, *client.Tunnel
 		return nil, nil, err
 	}
 
-	link, err := getLink(src)
+	index, err := getLinkIndex(src)
 	if err != nil {
 		glog.Errorf("Failed to get link for address: %v", err)
 		return nil, nil, err
@@ -509,7 +509,7 @@ func buildTunnelLocal(dst net.IP, tunnel *client.Tunnel) (net.IP, *client.Tunnel
 		Scope: netlink.SCOPE_LINK,
 		Src:   tunnel.Src,
 		Dst:   dstNet,
-		Link:  link,
+		LinkIndex:  index,
 	}
 	err = netlink.RouteAdd(route)
 	if err != nil {
@@ -580,7 +580,7 @@ func destroyTunnel(dst net.IP) (net.IP, error) {
 		}
 	}
 
-	link, err := getLink(src)
+	index, err := getLinkIndex(src)
 	if err != nil {
 		glog.Errorf("Failed to get link for address: %v", err)
 	} else {
@@ -590,7 +590,7 @@ func destroyTunnel(dst net.IP) (net.IP, error) {
 			Scope: netlink.SCOPE_LINK,
 			Src:   tunnel.Src,
 			Dst:   dstNet,
-			Link:  link,
+			LinkIndex:  index,
 		}
 		err = netlink.RouteDel(route)
 		if err != nil {

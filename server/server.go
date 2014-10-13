@@ -18,11 +18,11 @@ func getSource(dest net.IP) (net.IP, error) {
 	var link netlink.Link
 	for _, route := range routes {
 		if route.Dst == nil {
-			link = route.Link
+			link = &netlink.Dummy{netlink.LinkAttrs{Index: route.LinkIndex}}
 			source = route.Src
 
 		} else if route.Dst.Contains(dest) {
-			link = route.Link
+			link = &netlink.Dummy{netlink.LinkAttrs{Index: route.LinkIndex}}
 			source = route.Src
 			break
 		}
